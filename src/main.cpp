@@ -198,8 +198,8 @@ private:
     _pidxInGrid.clear();
     _pidxInGrid.resize(resX() * resY());
     for(int i = 0; i < _pos.size(); ++i){
-      int grid_x = (int)_pos[i][0] / resX(); 
-      int grid_y = (int)_pos[i][1] / resY(); 
+      int grid_x = (int)(_pos[i][0]);
+      int grid_y = (int)(_pos[i][1]);
       _pidxInGrid[idx1d(grid_x, grid_y)].push_back(i); 
     } 
   }
