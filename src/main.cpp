@@ -195,12 +195,34 @@ public:
 private:
   void buildNeighbor()
   {
-    // TODO:
+    _pidxInGrid.clear();
+    _pidxInGrid.resize(resX() * resY());
+    for(int i = 0; i < _pos.size(); ++i){
+      int grid_x = (int)_pos[i][0] / resX(); 
+      int grid_y = (int)_pos[i][1] / resY(); 
+      _pidxInGrid[idx1d(grid_x, grid_y)].push_back(i); 
+    } 
   }
 
   void computeDensity()
   {
-    // TODO:
+    // for every particle;
+    // density = sum(kernel(distance(particle, other particle in neighbooring grid squares)))
+    //
+    for(int i = 0; i < _pos.size(); ++i){
+      int grid_x = (int)_pos[i][0] / resX(); 
+      int grid_y = (int)_pos[i][1] / resY(); 
+       _density[i] = 0;
+      //sweep through all neighbooring squares
+      for(int x = std::max(grid_x-1, 0); x <= std::min(grid_x+1, resX()-1) ; x++ ){
+        for(int y = std::max(grid_y-1, 0); y <= std::min(grid_y+1, resY()-1) ; y++ ){
+          for(int neigh_particle : _pidxInGrid[idx1d(x, y)]){
+            _density[i] += _kernel.f(_pos[i].distanceTo(_pos[neigh_particle]));
+          }
+        }
+      }
+
+    }
   }
 
   void computePressure()
