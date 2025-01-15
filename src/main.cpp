@@ -16,6 +16,7 @@
 // have been supplied.
 // ----------------------------------------------------------------------------
 
+#include <algorithm>
 #define _USE_MATH_DEFINES
 
 #include <glad/gl.h>
@@ -144,8 +145,8 @@ public:
     // make sure for the other particle quantities
     _vel = std::vector<Vec2f>(_pos.size(), Vec2f(0, 0));
     _acc = std::vector<Vec2f>(_pos.size(), Vec2f(0, 0));
-    _p   = std::vector<Real>(_pos.size(), 0);
-    _d   = std::vector<Real>(_pos.size(), 0);
+    _pressure   = std::vector<Real>(_pos.size(), 0);
+    _density   = std::vector<Real>(_pos.size(), 0);
 
     _col = std::vector<float>(_pos.size()*4, 1.0); // RGBA
     _vln = std::vector<float>(_pos.size()*4, 0.0); // GL_LINES
@@ -251,13 +252,13 @@ private:
       _vel[*it] = (_pos[*it] - p0)/_dt;
     }
   }
-
+  
   void updateColor()
   {
     for(tIndex i=0; i<particleCount(); ++i) {
       _col[i*4+0] = 0.6;
       _col[i*4+1] = 0.6;
-      _col[i*4+2] = _d[i]/_d0;
+      _col[i*4+2] = _density[i]/1.0; //_d0;
     }
   }
 
@@ -279,8 +280,8 @@ private:
   std::vector<Vec2f> _pos;      // position
   std::vector<Vec2f> _vel;      // velocity
   std::vector<Vec2f> _acc;      // acceleration
-  std::vector<Real>  _p;        // pressure
-  std::vector<Real>  _d;        // density
+  std::vector<Real>  _pressure;        // pressure
+  std::vector<Real>  _density;        // density
 
   std::vector< std::vector<tIndex> > _pidxInGrid; // will help you find neighbor particles
 
