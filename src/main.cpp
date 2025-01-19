@@ -17,6 +17,7 @@
 // ----------------------------------------------------------------------------
 
 #include <algorithm>
+#include <unistd.h>
 #define _USE_MATH_DEFINES
 
 #include <glad/gl.h>
@@ -190,6 +191,7 @@ public:
     const Real gamma=7.0)
   {
     // TODO: pressure calculation
+    return k * (pow((d/d0), 7) -1);
   }
 
 private:
@@ -200,24 +202,24 @@ private:
     for(int i = 0; i < _pos.size(); ++i){
       int grid_x = (int)(_pos[i][0]);
       int grid_y = (int)(_pos[i][1]);
+      grid_x = std::max(0, std::min(grid_x, resX() - 1));
+      grid_y = std::max(0, std::min(grid_y, resY() - 1));
+      std::cout << "Adding neigh at pos:" << grid_x << "," << grid_y << " from pos:" << _pos[i][0] << "," << _pos[i][1] << std::endl;
       _pidxInGrid[idx1d(grid_x, grid_y)].push_back(i); 
     } 
   }
 
   void computeDensity()
   {
-    // for every particle;
-    // density = sum(kernel(distance(particle, other particle in neighbooring grid squares)))
-    //
     for(int i = 0; i < _pos.size(); ++i){
-      int grid_x = (int)_pos[i][0] / resX(); 
-      int grid_y = (int)_pos[i][1] / resY(); 
+      int grid_x = (int)(_pos[i][0]);
+      int grid_y = (int)(_pos[i][1]);
        _density[i] = 0;
       //sweep through all neighbooring squares
       for(int x = std::max(grid_x-1, 0); x <= std::min(grid_x+1, resX()-1) ; x++ ){
         for(int y = std::max(grid_y-1, 0); y <= std::min(grid_y+1, resY()-1) ; y++ ){
           for(int neigh_particle : _pidxInGrid[idx1d(x, y)]){
-            _density[i] += _kernel.f(_pos[i].distanceTo(_pos[neigh_particle]));
+            _density[i] += _m0 * _kernel.f(_pos[i].distanceTo(_pos[neigh_particle]));
           }
         }
       }
@@ -227,17 +229,47 @@ private:
 
   void computePressure()
   {
-    // TODO:
+    for(int i = 0; i < _pressure.size(); ++i){
+      _pressure[i] = equationOfState(_density[i], _d0, _k);
+      _pressure[i] = std::max(_pressure[i], 0.0f);
+      std::cout << _pressure[i] << " pressure for particle:" << i << std::endl;
+    }
   }
 
   void applyBodyForce()
   {
-    // TODO:
+    for(int i = 0; i < _acc.size(); ++i){
+      _acc[i] += _m0 * _g;
+
+    }
   }
 
   void applyPressureForce()
   {
-    // TODO:
+    for(int i = 0; i < _pos.size(); ++i){
+      Vec2f pressure_force = Vec2f(0,0);
+      
+      int grid_x = (int)(_pos[i][0]);
+      int grid_y = (int)(_pos[i][1]);
+      //sweep through all neighbooring squares
+      for(int x = std::max(grid_x-1, 0); x <= std::min(grid_x+1, resX()-1) ; x++ ){
+        for(int y = std::max(grid_y-1, 0); y <= std::min(grid_y+1, resY()-1) ; y++ ){
+          for(int neigh_particle : _pidxInGrid[idx1d(x, y)]){
+            Vec2f rij = _pos[i] - _pos[neigh_particle];
+              float len = rij.length();
+              
+              float density_i = std::max(_density[i], 1e-6f);
+              float density_j = std::max(_density[neigh_particle], 1e-6f);
+
+              float pressure_term = (_pressure[i] / (density_i * density_i) + 
+                                   _pressure[neigh_particle] / (density_j * density_j));
+                                  
+              pressure_force += (-_m0) * _m0 * pressure_term * _kernel.grad_w(rij, len);
+            }
+          }
+      }
+      _acc[i] += pressure_force;
+    }
   }
 
   void applyViscousForce()
@@ -247,12 +279,16 @@ private:
 
   void updateVelocity()
   {
-    // TODO:
+    for(int i = 0; i < _pos.size(); ++i){
+      _vel[i] += _acc[i] * _dt;
+    }
   }
 
   void updatePosition()
   {
-    // TODO:
+    for(int i = 0; i < _pos.size(); ++i){
+      _pos[i] += _vel[i] * _dt;
+    }
   }
 
   // simple collision detection/resolution for each particle
@@ -280,7 +316,7 @@ private:
     for(tIndex i=0; i<particleCount(); ++i) {
       _col[i*4+0] = 0.6;
       _col[i*4+1] = 0.6;
-      _col[i*4+2] = _density[i]/1.0; //_d0;
+      _col[i*4+2] = _density[i]/_d0;
     }
   }
 
@@ -545,7 +581,8 @@ void update(const float currentTime)
     // gAppTimer += dt;
 
     // solve 10 steps
-    for(int i=0; i<10; ++i) gSolver.update();
+    //for(int i=0; i<10; ++i) gSolver.update();
+    gSolver.update();
   }
 }
 
