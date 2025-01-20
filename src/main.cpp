@@ -248,27 +248,28 @@ private:
   {
     for(int i = 0; i < _pos.size(); ++i){
       Vec2f pressure_force = Vec2f(0,0);
-      
-      int grid_x = (int)(_pos[i][0]);
-      int grid_y = (int)(_pos[i][1]);
-      //sweep through all neighbooring squares
-      for(int x = std::max(grid_x-1, 0); x <= std::min(grid_x+1, resX()-1) ; x++ ){
-        for(int y = std::max(grid_y-1, 0); y <= std::min(grid_y+1, resY()-1) ; y++ ){
-          for(int neigh_particle : _pidxInGrid[idx1d(x, y)]){
-            Vec2f rij = _pos[i] - _pos[neigh_particle];
+
+        int grid_x = (int)(_pos[i][0]);
+        int grid_y = (int)(_pos[i][1]);
+        //sweep through all neighbooring squares
+        for(int x = std::max(grid_x-1, 0); x <= std::min(grid_x+1, resX()-1) ; x++ ){
+          for(int y = std::max(grid_y-1, 0); y <= std::min(grid_y+1, resY()-1) ; y++ ){
+            for(int neigh_particle : _pidxInGrid[idx1d(x, y)]){
+              if (i == neigh_particle) continue;
+              Vec2f rij = _pos[i] - _pos[neigh_particle];
               float len = rij.length();
-              
+
               float density_i = std::max(_density[i], 1e-6f);
               float density_j = std::max(_density[neigh_particle], 1e-6f);
 
-              float pressure_term = (_pressure[i] / (density_i * density_i) + 
+              float pressure_term = (_pressure[i] / (density_i * density_i) +
                                    _pressure[neigh_particle] / (density_j * density_j));
-                                  
-              pressure_force += (-_m0) * _m0 * pressure_term * _kernel.grad_w(rij, len);
-            }
+
+              pressure_force +=  (-_m0) * _m0 * pressure_term * _kernel.grad_w(rij, len);
           }
+        }
       }
-      _acc[i] += pressure_force;
+      _acc[i] += pressure_force/_density[i];
     }
   }
 
@@ -581,8 +582,7 @@ void update(const float currentTime)
     // gAppTimer += dt;
 
     // solve 10 steps
-    //for(int i=0; i<10; ++i) gSolver.update();
-    gSolver.update();
+    for(int i=0; i<10; ++i) gSolver.update();
   }
 }
 
