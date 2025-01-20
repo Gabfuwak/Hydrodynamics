@@ -48,6 +48,7 @@ bool gAppTimerStoppedP = true;
 // global options
 bool gPause = true;
 bool gSaveFile = false;
+bool gRecord = false;
 bool gShowGrid = true;
 bool gShowVel = false;
 int gSavedCnt = 0;
@@ -457,6 +458,7 @@ void printHelp()
     "    * G: toggle grid rendering" << std::endl <<
     "    * V: toggle velocity rendering" << std::endl <<
     "    * S: save current frame into a file" << std::endl <<
+    "    * R: toggle record mode" << std::endl <<
     "    * Q: quit the program" << std::endl;
 }
 
@@ -478,6 +480,14 @@ void keyCallback(GLFWwindow *window, int key, int scancode, int action, int mods
     printHelp();
   } else if(action == GLFW_PRESS && key == GLFW_KEY_S) {
     gSaveFile = !gSaveFile;
+  }
+  if (action == GLFW_PRESS && key == GLFW_KEY_R) {
+    gRecord = !gRecord;
+    if (gRecord) {
+      std::cout << "Recording started. Frames will be saved to current directory."<< std::endl;
+    } else {
+      std::cout << "Recording stopped." << std::endl;
+    }
   } else if(action == GLFW_PRESS && key == GLFW_KEY_G) {
     gShowGrid = !gShowGrid;
   } else if(action == GLFW_PRESS && key == GLFW_KEY_V) {
@@ -562,7 +572,7 @@ void initOpenGL()
 
 void init()
 {
-  gSolver.initScene(48, 32, 16, 16);
+  gSolver.initScene(48, 32, 28, 25);
 
   initGLFW();                   // Windowing system
   initOpenGL();
@@ -627,9 +637,15 @@ void render()
     glDisableClientState(GL_VERTEX_ARRAY);
   }
 
-  if(gSaveFile) {
+  if(gSaveFile || gRecord) {
     std::stringstream fpath;
-    fpath << "s" << std::setw(4) << std::setfill('0') << gSavedCnt++ << ".tga";
+
+    if (gSaveFile) {
+      fpath << "s" << std::setw(4) << std::setfill('0') << gSavedCnt++ << ".tga";
+      gSaveFile = false;
+    } else {
+      fpath << "f" << std::setw(6) << std::setfill('0') << gSavedCnt++ << ".tga";
+    }
 
     std::cout << "Saving file " << fpath.str() << " ... " << std::flush;
     const short int w = gWindowWidth;
