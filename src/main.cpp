@@ -261,6 +261,7 @@ private:
       _density[i] = _d0;
     }
     // Calculate density for all particles
+    #pragma omp parallel for
     for (int i = _numBoundaryParticles; i < _pos.size(); ++i) {
       int grid_x, grid_y;
       getGridPos(_pos[i], grid_x, grid_y);
@@ -279,6 +280,7 @@ private:
 
   void computePressure()
   {
+    #pragma omp parallel for
     for(int i = 0; i < _pressure.size(); ++i){
       _pressure[i] = equationOfState(_density[i], _d0, _k);
       _pressure[i] = std::max(_pressure[i], 0.0f);
@@ -288,6 +290,7 @@ private:
 
   void applyBodyForce()
   {
+    #pragma omp parallel for
     for(int i = 0; i < _acc.size(); ++i){
       _acc[i] += _m0 * _g;
 
@@ -295,6 +298,7 @@ private:
   }
 
   void applyPressureForce() {
+    #pragma omp parallel for
     for(int i = 0; i < _pos.size(); ++i) {
       Vec2f pressure_force = Vec2f(0,0);
       int grid_x, grid_y;
@@ -328,6 +332,7 @@ private:
   }
 
   void applyViscousForce() {
+    #pragma omp parallel for
     for(int i = 0; i < _pos.size(); ++i) {
       Vec2f viscous_force = Vec2f(0, 0);
       int grid_x, grid_y;
@@ -356,6 +361,7 @@ private:
 
   void updateVelocity()
   {
+    #pragma omp parallel for
     for(int i = _numBoundaryParticles; i < _pos.size(); ++i){
       _vel[i] += _acc[i] * _dt;
     }
@@ -363,6 +369,7 @@ private:
 
   void updatePosition()
   {
+    #pragma omp parallel for
     for(int i = _numBoundaryParticles; i < _pos.size(); ++i){
       _pos[i] += _vel[i] * _dt;
     }
