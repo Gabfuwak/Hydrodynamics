@@ -128,18 +128,21 @@ public:
     _resY = res_y;
 
     // set wall for boundary
-    _l = 0.5*_h;
-    _r = static_cast<Real>(res_x) - 0.5*_h;
-    _b = 0.5*_h;
+    _l = 2.5*_h;
+    _r = static_cast<Real>(res_x) - 2.5*_h;
+    _b = 2.5*_h;
     _t = static_cast<Real>(res_y) - 0.5*_h;
 
+    initBoundaryParticles();
     // sample a fluid mass
+    const Vec2f fluidOffset(0.5, 3.0);  // x=1.5 (1+0.5), y=3.0 start position
     for(int j=0; j<f_height; ++j) {
       for(int i=0; i<f_width; ++i) {
-        _pos.push_back(Vec2f(i+0.25, j+0.25));
-        _pos.push_back(Vec2f(i+0.75, j+0.25));
-        _pos.push_back(Vec2f(i+0.25, j+0.75));
-        _pos.push_back(Vec2f(i+0.75, j+0.75));
+        Vec2f basePos(i+1 + fluidOffset.x, j + fluidOffset.y);  // i+1 because we start at x=1
+        _pos.push_back(basePos + Vec2f(0.25, 0.25));
+        _pos.push_back(basePos + Vec2f(0.75, 0.25));
+        _pos.push_back(basePos + Vec2f(0.25, 0.75));
+        _pos.push_back(basePos + Vec2f(0.75, 0.75));
       }
     }
 
@@ -155,6 +158,44 @@ public:
     updateColor();
   }
 
+  void initBoundaryParticles() {
+      Real particleSpacing = _h;
+      _numBoundaryParticles = 0; // Initialize counter
+
+      // Add bottom wall
+      for (Real x = 0; x < _resX; x += 1.0) {
+        _pos.push_back(Vec2f(x + 0.25, 0.25));
+        _pos.push_back(Vec2f(x + 0.75, 0.25));
+        _pos.push_back(Vec2f(x + 0.25, 0.75));
+        _pos.push_back(Vec2f(x + 0.75, 0.75));
+        _numBoundaryParticles += 4;
+      }
+
+      // For side walls
+      for (Real y = 1.0; y < _resY; y += 1.0) {// start at 1 because we want to avoid overlap in the corners
+        // Left wall
+        _pos.push_back(Vec2f(0.25, y + 0.25));
+        _pos.push_back(Vec2f(0.75, y + 0.25));
+        _pos.push_back(Vec2f(0.25, y + 0.75));
+        _pos.push_back(Vec2f(0.75, y + 0.75));
+
+        // Right wall
+        _pos.push_back(Vec2f(_resX - 0.75, y + 0.25));
+        _pos.push_back(Vec2f(_resX - 0.25, y + 0.25));
+        _pos.push_back(Vec2f(_resX - 0.75, y + 0.75));
+        _pos.push_back(Vec2f(_resX - 0.25, y + 0.75));
+        _numBoundaryParticles+=8;
+      }
+
+      // Initialize arrays for boundary particles
+      _vel.resize(_numBoundaryParticles, Vec2f(0, 0));
+      _acc.resize(_numBoundaryParticles, Vec2f(0, 0));
+      _pressure.resize(_numBoundaryParticles, 0);
+      _density.resize(_numBoundaryParticles, 0);
+      _col.resize(_numBoundaryParticles * 4, 1.0);
+      _vln.resize(_numBoundaryParticles * 4, 0.0);
+  }
+  
   void update()
   {
     std::cout << '.' << std::flush;
@@ -214,7 +255,12 @@ private:
     }
 
   void computeDensity() {
-    for(int i = 0; i < _pos.size(); ++i) {
+    // Reset boundary particle density
+    for (int i = 0; i < _numBoundaryParticles; ++i) {
+      _density[i] = _d0;
+    }
+    // Calculate density for all particles
+    for (int i = _numBoundaryParticles; i < _pos.size(); ++i) {
       int grid_x, grid_y;
       getGridPos(_pos[i], grid_x, grid_y);
       _density[i] = 0;
@@ -309,14 +355,14 @@ private:
 
   void updateVelocity()
   {
-    for(int i = 0; i < _pos.size(); ++i){
+    for(int i = _numBoundaryParticles; i < _pos.size(); ++i){
       _vel[i] += _acc[i] * _dt;
     }
   }
 
   void updatePosition()
   {
-    for(int i = 0; i < _pos.size(); ++i){
+    for(int i = _numBoundaryParticles; i < _pos.size(); ++i){
       _pos[i] += _vel[i] * _dt;
     }
   }
@@ -325,7 +371,7 @@ private:
   void resolveCollision()
   {
     std::vector<tIndex> need_res;
-    for(tIndex i=0; i<particleCount(); ++i) {
+    for(tIndex i=_numBoundaryParticles; i<particleCount(); ++i) {
       if(_pos[i].x<_l || _pos[i].y<_b || _pos[i].x>_r || _pos[i].y>_t)
         need_res.push_back(i);
     }
@@ -365,6 +411,7 @@ private:
   const CubicSpline _kernel;
 
   // particle data
+  tIndex _numBoundaryParticles;
   std::vector<Vec2f> _pos;      // position
   std::vector<Vec2f> _vel;      // velocity
   std::vector<Vec2f> _acc;      // acceleration
