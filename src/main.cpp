@@ -275,7 +275,30 @@ private:
 
   void applyViscousForce()
   {
-    // TODO:
+      for(int i = 0; i < _pos.size(); ++i) {
+          Vec2f viscous_force = Vec2f(0, 0);
+          int grid_x = (int)(_pos[i][0]);
+          int grid_y = (int)(_pos[i][1]);
+
+          for(int x = std::max(grid_x-1, 0); x <= std::min(grid_x+1, resX()-1); x++) {
+              for(int y = std::max(grid_y-1, 0); y <= std::min(grid_y+1, resY()-1); y++) {
+                  for(int neigh_particle : _pidxInGrid[idx1d(x, y)]) {
+                      if (i == neigh_particle) continue;
+
+                      Vec2f xij = _pos[i] - _pos[neigh_particle];
+                      Vec2f vij = _vel[i] - _vel[neigh_particle];
+                      float len = xij.length();
+                      
+                      if (len > 0) {
+                          float dot_product = xij.dotProduct(vij);
+                          viscous_force += 2 * _nu * _m0 * (dot_product / (len * len + 0.01f * _h * _h)) 
+                                           * _kernel.grad_w(xij, len) / _density[neigh_particle];
+                      }
+                  }
+              }
+          }
+          _acc[i] += viscous_force;
+      }
   }
 
   void updateVelocity()
