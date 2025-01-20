@@ -195,35 +195,38 @@ public:
   }
 
 private:
+  void getGridPos(const Vec2f& pos, int& grid_x, int& grid_y) {
+    grid_x = static_cast<int>(std::floor(pos[0]));
+    grid_y = static_cast<int>(std::floor(pos[1]));
+    grid_x = std::max(0, std::min(grid_x, resX() - 1));
+    grid_y = std::max(0, std::min(grid_y, resY() - 1));
+}
   void buildNeighbor()
-  {
-    _pidxInGrid.clear();
-    _pidxInGrid.resize(resX() * resY());
-    for(int i = 0; i < _pos.size(); ++i){
-      int grid_x = (int)(_pos[i][0]);
-      int grid_y = (int)(_pos[i][1]);
-      grid_x = std::max(0, std::min(grid_x, resX() - 1));
-      grid_y = std::max(0, std::min(grid_y, resY() - 1));
-      std::cout << "Adding neigh at pos:" << grid_x << "," << grid_y << " from pos:" << _pos[i][0] << "," << _pos[i][1] << std::endl;
-      _pidxInGrid[idx1d(grid_x, grid_y)].push_back(i); 
-    } 
-  }
+    {
+      _pidxInGrid.clear();
+      _pidxInGrid.resize(resX() * resY());
+      for(int i = 0; i < _pos.size(); ++i){
+        int grid_x, grid_y;
+        getGridPos(_pos[i], grid_x, grid_y);
+        //std::cout << "Adding neigh at pos:" << grid_x << "," << grid_y << " from pos:" << _pos[i][0] << "," << _pos[i][1] << std::endl;
+        _pidxInGrid[idx1d(grid_x, grid_y)].push_back(i); 
+      } 
+    }
 
-  void computeDensity()
-  {
-    for(int i = 0; i < _pos.size(); ++i){
-      int grid_x = (int)(_pos[i][0]);
-      int grid_y = (int)(_pos[i][1]);
-       _density[i] = 0;
-      //sweep through all neighbooring squares
-      for(int x = std::max(grid_x-1, 0); x <= std::min(grid_x+1, resX()-1) ; x++ ){
-        for(int y = std::max(grid_y-1, 0); y <= std::min(grid_y+1, resY()-1) ; y++ ){
-          for(int neigh_particle : _pidxInGrid[idx1d(x, y)]){
-            _density[i] += _m0 * _kernel.f(_pos[i].distanceTo(_pos[neigh_particle]));
+  void computeDensity() {
+    for(int i = 0; i < _pos.size(); ++i) {
+      int grid_x, grid_y;
+      getGridPos(_pos[i], grid_x, grid_y);
+      _density[i] = 0;
+
+      for(int x = std::max(grid_x-1, 0); x <= std::min(grid_x+1, resX()-1); x++) {
+        for(int y = std::max(grid_y-1, 0); y <= std::min(grid_y+1, resY()-1); y++) {
+          for(int neigh_particle : _pidxInGrid[idx1d(x, y)]) {
+            float dist = _pos[i].distanceTo(_pos[neigh_particle]);
+            _density[i] += _m0 * _kernel.f(dist);
           }
         }
       }
-
     }
   }
 
@@ -232,7 +235,7 @@ private:
     for(int i = 0; i < _pressure.size(); ++i){
       _pressure[i] = equationOfState(_density[i], _d0, _k);
       _pressure[i] = std::max(_pressure[i], 0.0f);
-      std::cout << _pressure[i] << " pressure for particle:" << i << std::endl;
+      //std::cout << _pressure[i] << " pressure for particle:" << i << std::endl;
     }
   }
 
@@ -244,28 +247,32 @@ private:
     }
   }
 
-  void applyPressureForce()
-  {
-    for(int i = 0; i < _pos.size(); ++i){
+  void applyPressureForce() {
+    for(int i = 0; i < _pos.size(); ++i) {
       Vec2f pressure_force = Vec2f(0,0);
+      int grid_x, grid_y;
+      getGridPos(_pos[i], grid_x, grid_y);
 
-        int grid_x = (int)(_pos[i][0]);
-        int grid_y = (int)(_pos[i][1]);
-        //sweep through all neighbooring squares
-        for(int x = std::max(grid_x-1, 0); x <= std::min(grid_x+1, resX()-1) ; x++ ){
-          for(int y = std::max(grid_y-1, 0); y <= std::min(grid_y+1, resY()-1) ; y++ ){
-            for(int neigh_particle : _pidxInGrid[idx1d(x, y)]){
-              if (i == neigh_particle) continue;
-              Vec2f rij = _pos[i] - _pos[neigh_particle];
-              float len = rij.length();
+      for(int x = std::max(grid_x-1, 0); x <= std::min(grid_x+1, resX()-1); x++) {
+        for(int y = std::max(grid_y-1, 0); y <= std::min(grid_y+1, resY()-1); y++) {
+          for(int neigh_particle : _pidxInGrid[idx1d(x, y)]) {
+            if (i == neigh_particle) continue;
 
-              float density_i = std::max(_density[i], 1e-6f);
-              float density_j = std::max(_density[neigh_particle], 1e-6f);
+            Vec2f rij = _pos[i] - _pos[neigh_particle];
+            float len = rij.length();
 
-              float pressure_term = (_pressure[i] / (density_i * density_i) +
-                                   _pressure[neigh_particle] / (density_j * density_j));
+            // Safety check for tiny distances
+            if (len < 1e-10) {
+              continue;  // Skip extremely close particles
+            }
 
-              pressure_force +=  (-_m0) * _m0 * pressure_term * _kernel.grad_w(rij, len);
+            float density_i = std::max(_density[i], 1e-6f);
+            float density_j = std::max(_density[neigh_particle], 1e-6f);
+
+            float pressure_term = (_pressure[i] / (density_i * density_i) +
+                                 _pressure[neigh_particle] / (density_j * density_j));
+
+            pressure_force += (-_m0) * _m0 * pressure_term * _kernel.grad_w(rij, len);
           }
         }
       }
@@ -273,32 +280,31 @@ private:
     }
   }
 
-  void applyViscousForce()
-  {
-      for(int i = 0; i < _pos.size(); ++i) {
-          Vec2f viscous_force = Vec2f(0, 0);
-          int grid_x = (int)(_pos[i][0]);
-          int grid_y = (int)(_pos[i][1]);
+  void applyViscousForce() {
+    for(int i = 0; i < _pos.size(); ++i) {
+      Vec2f viscous_force = Vec2f(0, 0);
+      int grid_x, grid_y;
+      getGridPos(_pos[i], grid_x, grid_y);
 
-          for(int x = std::max(grid_x-1, 0); x <= std::min(grid_x+1, resX()-1); x++) {
-              for(int y = std::max(grid_y-1, 0); y <= std::min(grid_y+1, resY()-1); y++) {
-                  for(int neigh_particle : _pidxInGrid[idx1d(x, y)]) {
-                      if (i == neigh_particle) continue;
+      for(int x = std::max(grid_x-1, 0); x <= std::min(grid_x+1, resX()-1); x++) {
+        for(int y = std::max(grid_y-1, 0); y <= std::min(grid_y+1, resY()-1); y++) {
+          for(int neigh_particle : _pidxInGrid[idx1d(x, y)]) {
+            if (i == neigh_particle) continue;
 
-                      Vec2f xij = _pos[i] - _pos[neigh_particle];
-                      Vec2f vij = _vel[i] - _vel[neigh_particle];
-                      float len = xij.length();
-                      
-                      if (len > 0) {
-                          float dot_product = xij.dotProduct(vij);
-                          viscous_force += 2 * _nu * _m0 * (dot_product / (len * len + 0.01f * _h * _h)) 
-                                           * _kernel.grad_w(xij, len) / _density[neigh_particle];
-                      }
-                  }
-              }
+            Vec2f xij = _pos[i] - _pos[neigh_particle];
+            Vec2f vij = _vel[i] - _vel[neigh_particle];
+            float len = xij.length();
+            
+            if (len > 1e-10) { // same safety check as or pressure
+              float dot_product = xij.dotProduct(vij);
+              viscous_force += 2 * _nu * _m0 * (dot_product / (len * len + 0.01f * _h * _h)) 
+                              * _kernel.grad_w(xij, len) / _density[neigh_particle];
+            }
           }
-          _acc[i] += viscous_force;
+        }
       }
+      _acc[i] += viscous_force;
+    }
   }
 
   void updateVelocity()
