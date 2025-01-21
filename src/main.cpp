@@ -397,10 +397,26 @@ private:
   
   void updateColor()
   {
-    for(tIndex i=0; i<particleCount(); ++i) {
+
+    for(tIndex i=0; i<_numBoundaryParticles; ++i) {
       _col[i*4+0] = 0.6;
       _col[i*4+1] = 0.6;
-      _col[i*4+2] = _density[i]/_d0;
+      _col[i*4+2] = 0.6;
+    }
+    const float minDensityRatio = 0.7f;   // Below this will be lightest blue
+    const float maxDensityRatio = 1.3f;   // Above this will be darkest blue
+    for(tIndex i=_numBoundaryParticles; i<particleCount(); ++i) {
+      float densityRatio = _density[i] / _d0;
+      densityRatio = std::max(minDensityRatio, std::min(densityRatio, maxDensityRatio));
+      float t = (densityRatio - minDensityRatio) / (maxDensityRatio - minDensityRatio);
+      // Red component: 0.9 -> 0.0
+      _col[i*4+0] = 0.9f * (1.0f - t);
+      
+      // Green component: 0.9 -> 0.2
+      _col[i*4+1] = 0.9f * (1.0f - t) + 0.2f * t;
+      
+      // Blue component: always 1.0
+      _col[i*4+2] = 1.0f;
     }
   }
 
@@ -453,7 +469,7 @@ private:
   Real _gamma;                  // EOS power factor
 };
 
-SphSolver gSolver(0.08, 0.5, 1e3, Vec2f(0, -9.8), 0.01, 7.0);
+SphSolver gSolver(8.0, 0.5, 1e3, Vec2f(0, -9.8), 0.01, 7.0);
 
 void printHelp()
 {
@@ -579,7 +595,7 @@ void initOpenGL()
 
 void init()
 {
-  gSolver.initScene(48, 32, 28, 25);
+  gSolver.initScene(48, 32, 16, 16);
 
   initGLFW();                   // Windowing system
   initOpenGL();
@@ -623,7 +639,7 @@ void render()
   glEnableClientState(GL_VERTEX_ARRAY);
   glEnableClientState(GL_COLOR_ARRAY);
 
-  glPointSize(0.25f*kViewScale);
+  glPointSize(0.5f*kViewScale);
 
   glColorPointer(4, GL_FLOAT, 0, &gSolver.color(0));
   glVertexPointer(2, GL_FLOAT, 0, &gSolver.position(0));
