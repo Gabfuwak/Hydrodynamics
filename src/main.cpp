@@ -52,6 +52,7 @@ bool gRecord = false;
 bool gShowGrid = true;
 bool gShowVel = false;
 int gSavedCnt = 0;
+bool gShowSDF = false;
 
 const int kViewScale = 15;
 
@@ -124,6 +125,7 @@ public:
     const int res_x, const int res_y, const int f_width, const int f_height)
   {
     _pos.clear();
+    _sdf.clear();
 
     _resX = res_x;
     _resY = res_y;
@@ -204,6 +206,7 @@ public:
     buildNeighbor();
     computeDensity();
     computePressure();
+    computeSignedDistanceField();
 
     _acc = std::vector<Vec2f>(_pos.size(), Vec2f(0, 0));
     applyBodyForce();
@@ -216,6 +219,9 @@ public:
     resolveCollision();
 
     updateColor();
+    
+    
+
     if(gShowVel) updateVelLine();
   }
 
@@ -223,6 +229,8 @@ public:
   const Vec2f& position(const tIndex i) const { return _pos[i]; }
   const float& color(const tIndex i) const { return _col[i]; }
   const float& vline(const tIndex i) const { return _vln[i]; }
+  const std::vector<Real>& getSDF() const { return _sdf; }
+  Real getParticleRadius() const { return _h/2; }
 
   int resX() const { return _resX; }
   int resY() const { return _resY; }
@@ -359,6 +367,45 @@ private:
     }
   }
 
+  void computeSignedDistanceField() {
+      // Initialize or reset the SDF
+      _sdf.resize(_resX * _resY, 0.0);
+
+      // For each grid cell
+      #pragma omp parallel for collapse(2)
+      for(int i = 0; i < _resX; ++i) {
+          for(int j = 0; j < _resY; ++j) {
+              Vec2f evalPoint(i + 0.5, j + 0.5);  // Center of grid cell
+              
+              // Find weighted averages of nearby particles
+              Vec2f avgPos(0, 0);
+              Real totalWeight = 0;
+              
+              // Look in neighboring cells
+              for(int ni = std::max(0, i-1); ni <= std::min(_resX-1, i+1); ++ni) {
+                  for(int nj = std::max(0, j-1); nj <= std::min(_resY-1, j+1); ++nj) {
+                      for(const auto& pIdx : _pidxInGrid[idx1d(ni, nj)]) {
+                          Real dist = evalPoint.distanceTo(_pos[pIdx]);
+                          if(dist < 2.0 * _h) {  // 2.0 * _h is support radius
+                              Real weight = _kernel.f(dist);
+                              avgPos += _pos[pIdx] * weight;
+                              totalWeight += weight;
+                          }
+                      }
+                  }
+              }
+              
+              if(totalWeight > 1e-6) {  // If we found any nearby particles
+                  avgPos /= totalWeight;
+                  Real phi = evalPoint.distanceTo(avgPos) - (_h/2.0);
+                  _sdf[idx1d(i, j)] = phi;
+              } else {
+                  _sdf[idx1d(i, j)] = 2.0 * _h;  // Some large positive value
+              }
+          }
+      }
+  }
+
   void updateVelocity()
   {
     #pragma omp parallel for
@@ -447,6 +494,9 @@ private:
   std::vector<float> _col;    // particle color; just for visualization
   std::vector<float> _vln;    // particle velocity lines; just for visualization
 
+  // signed distance field
+  std::vector<Real> _sdf;  // The signed distance field values
+
   // simulation
   Real _dt;                     // time step
 
@@ -479,6 +529,7 @@ void printHelp()
     "    * H: print this help" << std::endl <<
     "    * P: toggle simulation" << std::endl <<
     "    * G: toggle grid rendering" << std::endl <<
+    "    * Y: toggle SDF rendering" << std::endl <<
     "    * V: toggle velocity rendering" << std::endl <<
     "    * S: save current frame into a file" << std::endl <<
     "    * R: toggle record mode" << std::endl <<
@@ -513,6 +564,8 @@ void keyCallback(GLFWwindow *window, int key, int scancode, int action, int mods
     }
   } else if(action == GLFW_PRESS && key == GLFW_KEY_G) {
     gShowGrid = !gShowGrid;
+  } else if(action == GLFW_PRESS && key == GLFW_KEY_Y) {
+    gShowSDF = !gShowSDF;
   } else if(action == GLFW_PRESS && key == GLFW_KEY_V) {
     gShowVel = !gShowVel;
   } else if(action == GLFW_PRESS && key == GLFW_KEY_P) {
@@ -629,6 +682,41 @@ void render()
       glVertex2f(static_cast<Real>(gSolver.resX()), static_cast<Real>(j));
     }
     glEnd();
+  }
+
+  // Render SDF
+  if(gShowSDF){ 
+    // Render SDF visualization
+    const float maxDist = 2.0f * gSolver.getParticleRadius();
+    const auto& sdf = gSolver.getSDF();
+    
+    glEnable(GL_BLEND);
+    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+    
+    glBegin(GL_QUADS);
+    for(int i = 0; i < gSolver.resX(); ++i) {
+      for(int j = 0; j < gSolver.resY(); ++j) {
+        float sdfValue = sdf[i + j * gSolver.resX()];
+        
+        // Normalize and clamp SDF value
+        float t = std::max(-1.0f, std::min(1.0f, sdfValue/maxDist));
+        
+        // Inside: red gradient
+        // Outside: blue gradient
+        float r = (t < 0) ? -t : 0;
+        float b = (t > 0) ? t : 0;
+        float alpha = 0.2f;  // Adjust for desired transparency
+        
+        glColor4f(r, 0, b, alpha);
+        glVertex2f(i, j);
+        glVertex2f(i+1, j);
+        glVertex2f(i+1, j+1);
+        glVertex2f(i, j+1);
+      }
+    }
+    glEnd();
+    
+    glDisable(GL_BLEND);
   }
 
   // render particles
