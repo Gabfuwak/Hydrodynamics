@@ -54,7 +54,7 @@ Instead of working on the blue channel, i decided to set it permanently to 0, an
 In addition, I made the particles bigger, matching their size in the simulation.
 
 These changes makes the simulation much more aesthetically pleasing, with low density white particles emulating a sort of sea foam, which pairs well with a little higher viscosity, creating beautiful waves. 
-![[Pasted image 20250121233118.png]]
+
 ## Results
 
 ### Simulation Stability
@@ -68,6 +68,7 @@ The use of a grid-based neighbor search and the optimization of storing boundary
 ### Visual Output
 
 The simulation produces a visually plausible fluid behavior. Particles move and interact in a way that is consistent with the applied forces and constraints. The use of a color gradient to represent density provides a clear visualization of density variations within the fluid, even mimicking sea foam in some cases.
+![image](https://github.com/user-attachments/assets/e93d346f-ff15-45b1-b504-1e06ae1d45cb)
 
 ## Perspectives and limitations
 
