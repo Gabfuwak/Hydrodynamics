@@ -49,11 +49,12 @@ for(int i=_numBoundaryParticles; i<particleCount(); ++i) {
 
 The original code had a color modification depending on density, changing the blue level. This had an issue where low density turned the particles yellow because we removed all the blue channel.
 
-Instead of working on the blue channel, i decided to set it permanently to 0, and make the other vary. The lower the density, the higher the green and red channel, making the particle light blue when the density is low, and deep blue when the density is high.
+Instead of working on the blue channel, i decided to set it permanently to 1, and make the other vary. The lower the density, the higher the green and red channel, making the particle light blue when the density is low, and deep blue when the density is high.
 
 In addition, I made the particles bigger, matching their size in the simulation.
 
 These changes makes the simulation much more aesthetically pleasing, with low density white particles emulating a sort of sea foam, which pairs well with a little higher viscosity, creating beautiful waves. 
+![image](https://github.com/user-attachments/assets/e93d346f-ff15-45b1-b504-1e06ae1d45cb)
 
 ## Results
 
@@ -68,7 +69,7 @@ The use of a grid-based neighbor search and the optimization of storing boundary
 ### Visual Output
 
 The simulation produces a visually plausible fluid behavior. Particles move and interact in a way that is consistent with the applied forces and constraints. The use of a color gradient to represent density provides a clear visualization of density variations within the fluid, even mimicking sea foam in some cases.
-![image](https://github.com/user-attachments/assets/e93d346f-ff15-45b1-b504-1e06ae1d45cb)
+
 
 ## Perspectives and limitations
 
